@@ -601,7 +601,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
       supa.from("swaps").select("*").order("created_at"),
       supa.from("absences").select("*"),
     ]);
-    if (sw.error || ab.error) { status("Couldn't load the roster. Check your connection and reload.", true); return; }
+    if (sw.error || ab.error) { const e = sw.error || ab.error; status(`Couldn't load the roster (${e.code || "error"}: ${e.message}). Check your connection and reload.`, true); return; }
     S.swaps = sw.data.map(fromRow);
     S.absences = Object.fromEntries(ab.data.map(r => [r.date, { reason: r.reason, staff: r.staff, updatedAt: r.updated_at }]));
     status("");
@@ -620,7 +620,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   async function start(session) {
     if (!session) return showSignedOut();
     const { data, error } = await supa.from("staff_access").select("role").maybeSingle();
-    if (error) { status("Couldn't check your access. Reload the page to try again.", true); return; }
+    if (error) { status(`Couldn't check your access (${error.code || "error"}: ${error.message}). Reload the page to try again.`, true); return; }
     if (!data) {
       await supa.auth.signOut();
       return showSignedOut(`${session.user.email} isn't on the roster. Ask the manager to add you.`);
