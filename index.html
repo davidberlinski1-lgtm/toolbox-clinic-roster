@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171b19" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Admin Roster">
+<meta name="robots" content="noindex">
+<title>Toolbox Clinic Admin Roster</title>
+<style>
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{padding-top:env(safe-area-inset-top,0px)}
+/* Layout: one 980px column. Title, a bar of tabs + controls, then a bordered card holding a table or list. Dialogs open as centred modals. */
+:root{--dj:#3a66b0;--dn:#9a4a8c;--ds:#b0701f;--bg:#f6f5f1;--card:#fff;--ink:#1d2320;--mute:#68716c;--line:#dcdad2;--acc:#1f6f5c;--accbg:#e0f0ea;--warn:#b3402a;--warnbg:#fbe9e4;--amber:#8a5a00;--amberbg:#fbf0d8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--dj:#8fb3f2;--dn:#e2a2d6;--ds:#ebb676;--bg:#171b19;--card:#1f2522;--ink:#eceee9;--mute:#9aa39d;--line:#343c38;--acc:#5fc2a6;--accbg:#22382f;--warn:#f0917c;--warnbg:#3b2620;--amber:#e8b562;--amberbg:#3a2e17;color-scheme:dark}}
+:root[data-theme="dark"]{--dj:#8fb3f2;--dn:#e2a2d6;--ds:#ebb676;--bg:#171b19;--card:#1f2522;--ink:#eceee9;--mute:#9aa39d;--line:#343c38;--acc:#5fc2a6;--accbg:#22382f;--warn:#f0917c;--warnbg:#3b2620;--amber:#e8b562;--amberbg:#3a2e17;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 2px}
+.sub{color:var(--mute);font-size:13px;margin:0 0 12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.sp{flex:1}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button.p{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
+button.on{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:600}
+button.x{color:var(--warn)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,td.c:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--warn);color:var(--bg);font-size:12px;line-height:18px;text-align:center}
+.who{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mute)}
+.who select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:14px}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.pad{padding:4px 14px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}
+th{font-weight:600;font-size:13px}th small{display:block;color:var(--mute);font-weight:400}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:left;width:160px}
+td.n small{display:block;color:var(--mute);font-weight:400}
+.c{cursor:pointer}.c:hover{background:var(--accbg)}
+.sh{font-weight:600}.sh small{display:block;font-weight:400;color:var(--mute)}
+.off{color:var(--mute)}
+.ed{outline:2px solid var(--acc);outline-offset:-3px;border-radius:6px}
+.nw{color:var(--warn);font-size:13px;font-weight:600}.nw small{display:block;font-weight:400;color:var(--mute)}
+.pend{outline:2px dashed var(--amber);outline-offset:-3px;border-radius:6px}
+.today{background:var(--accbg)}
+.cov td{background:var(--bg);font-size:13px;color:var(--mute)}.cov .z{color:var(--warn);font-weight:600}
+.tot{font-weight:700}
+.note{color:var(--mute);font-size:13px;margin:10px 0 0}
+.status{font-size:13px;color:var(--mute);margin:-4px 0 10px}.status.err{color:var(--warn)}
+.rq{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+.rq:first-child{border-top:0}
+.rq .d{min-width:120px;font-weight:600}
+.rq .q{color:var(--mute);font-style:italic;flex-basis:100%;font-size:13px}
+.wk{padding:12px 0 4px;color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;border-top:1px solid var(--line)}
+.wk:first-child{border-top:0}
+.wk + .rq{border-top:0}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--accbg);color:var(--acc)}
+.tag.a{background:var(--amberbg);color:var(--amber)}
+.tag.w{background:var(--warnbg);color:var(--warn)}
+.tag.m{background:transparent;color:var(--mute);border:1px solid var(--line)}
+.alert{background:var(--amberbg);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.alert strong{display:block;margin-bottom:2px}
+.split{display:grid;gap:12px}
+h2{font-size:15px;margin:0;padding:12px 0 4px}
+.ov{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
+.md{background:var(--card);color:var(--ink);border-radius:14px;padding:18px;width:100%;max-width:380px;max-height:calc(100% - 32px);overflow-y:auto}
+.md h2{font-size:16px;margin:0 0 4px;padding:0}
+.md .ctx{color:var(--mute);font-size:13px;margin:0 0 6px}
+.md label{display:block;font-size:13px;color:var(--mute);margin:10px 0 3px}
+.md label.r{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px;margin:6px 0}
+.md input:not([type=radio]),.md select,.md textarea{width:100%;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.md textarea{min-height:56px;resize:vertical}
+.row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:20px;font-size:13px;max-width:calc(100vw - 32px);z-index:6}
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tabs svg{display:none}
+.tabs .sm{display:none}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px;flex:none}
+.d-justin{background:var(--dj)}.d-jennifer{background:var(--dn)}.d-samantha{background:var(--ds)}
+@media (min-width:641px){.only-m{display:none!important}}
+.fn{display:none}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.tile .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .hv{font-size:22px;font-weight:700;line-height:1.2}.tile .hv small{font-size:13px;font-weight:600;color:var(--mute);margin-left:2px}
+.tile .mt{font-size:12px;color:var(--mute)}
+.mlist{display:grid}
+.mday{box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:12px 14px;min-height:64px}
+.mday:last-child{border-bottom:0}
+.mday.is-today{background:var(--accbg)}
+.mday .dd{width:44px;flex:none;line-height:1.15}.mday .dd b{display:block;font-size:13px;color:var(--mute);font-weight:600}.mday .dd span{font-size:18px;font-weight:700}
+.mday .dm{flex:1;min-width:0;display:grid;gap:2px}
+.mday .dm strong{display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mday .dm small{color:var(--mute);font-size:13px}
+.mday .tg{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.mday .chev{color:var(--mute);font-size:22px;line-height:1;flex:none}
+.mday.pend{outline:0;box-shadow:inset 3px 0 0 var(--amber)}
+.mday.sw{box-shadow:inset 3px 0 0 var(--acc)}
+.whrs{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--mute);margin-top:10px}
+.whrs b{color:var(--ink)}
+@media (max-width:640px){
+  main{padding:12px 16px calc(84px + env(safe-area-inset-bottom,0px))}
+  h1{font-size:18px}
+  .sub{font-size:12px;margin-bottom:10px}
+  .only-d{display:none!important}
+  .who{flex:1 1 100%;order:-1}
+  .who select{flex:1;font-size:16px;padding:10px;min-height:44px}
+  .bar{gap:6px}
+  .bar button{min-height:44px;min-width:44px}
+  .bar .grow{flex:1 1 40%}
+  .bar strong.rng{flex:1;text-align:center}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:4;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+  .tabs button{border:0;background:none;border-radius:10px;padding:6px 2px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:600;color:var(--mute);position:relative}
+  .tabs button.on{background:var(--accbg);color:var(--acc)}
+  .tabs svg{display:block;width:22px;height:22px}
+  .tabs .lg{display:none}.tabs .sm{display:inline}
+  .tabs .badge{position:absolute;top:2px;right:calc(50% - 22px);margin:0}
+  .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  .fn{display:inline}.ln{display:none}
+  .mt-tbl table{min-width:0;font-size:13px}
+  .mt-tbl th,.mt-tbl td{padding:8px 4px}
+  .mt-tbl td.n,.mt-tbl th.n{width:auto;padding-left:10px;white-space:nowrap}
+  .hm{display:none}
+  .tile{padding:8px 10px}.tile .hv{font-size:19px}
+  .rq{padding:12px 0}
+  .rq > button{flex:1 1 auto;min-height:44px}
+  .rq .d{min-width:0}
+  .ov{align-items:flex-end;padding:0}
+  .md{max-width:none;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));max-height:88%}
+  .md input:not([type=radio]),.md select,.md textarea{font-size:16px;padding:10px}
+  .md label.r{min-height:40px}
+  .md input[type=radio]{width:20px;height:20px}
+  .row button{flex:1;min-height:46px}
+  textarea.copy{font-size:16px}
+}
+textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-height:120px}
+.signin{max-width:380px;margin:24px auto 0;display:grid;gap:10px}
+.signin label{font-size:13px;color:var(--mute)}
+.signin input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:16px}
+.signin button{min-height:44px}
+.signin .code{letter-spacing:.3em;font-size:20px;text-align:center}
+.who .me{font-weight:600;color:var(--ink)}
+@media (max-width:640px){.who{justify-content:space-between}}
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Toolbox Clinic Admin Roster</h1>
+  <p class="sub">Shifts 9:00–15:00 · 30m unpaid break · 5.5 paid hours per shift</p>
+  <div class="bar">
+    <nav id="tabs" class="tabs" aria-label="Sections"></nav>
+    <span class="sp"></span>
+    <div class="who" id="who" hidden></div>
+  </div>
+  <div id="status" class="status">Loading…</div>
+  <section id="signin" class="signin" hidden>
+    <form id="emailForm" style="display:grid;gap:10px">
+      <label for="email">Sign in with your email to see the roster</label>
+      <input id="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+      <button class="p" type="submit">Email me a sign-in link</button>
+    </form>
+    <form id="codeForm" style="display:grid;gap:10px" hidden>
+      <p id="sentMsg" style="margin:0"></p>
+      <label for="code" id="codeLabel">If your email has a 6-digit code instead, enter it here</label>
+      <input id="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+      <button class="p" type="submit">Sign in with code</button>
+      <button type="button" id="restart">Use a different email</button>
+    </form>
+    <p class="note" id="signinMsg"></p>
+  </section>
+  <div id="view"></div>
+</main>
+<div id="modal"></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(() => {
+  // ---------- Roster rules ----------
+  const STAFF = {
+    justin:   { name: "Justin Serong", first: "Justin" },
+    jennifer: { name: "Jennifer Wild", first: "Jennifer" },
+    samantha: { name: "Samantha Borg", first: "Samantha" },
+  };
+  const IDS = Object.keys(STAFF);
+  const REGULAR = { 1: "justin", 2: "justin", 3: "jennifer", 4: "samantha", 5: "samantha" }; // getDay(): Mon=1 … Fri=5
+  const START = "09:00", FINISH = "15:00", BREAK = 30, PAID = 5.5;
+  const LOOKAHEAD_WEEKS = 8;
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+  const REASONS = ["Sick leave", "Annual leave", "Public holiday", "Clinic closed", "Other"];
+
+  // ---------- Dates ----------
+  const pad = n => String(n).padStart(2, "0");
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d, 12); };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const isWeekday = d => d.getDay() >= 1 && d.getDay() <= 5;
+  const mondayOf = d => { const x = new Date(d); x.setHours(12, 0, 0, 0); return addDays(x, -((x.getDay() + 6) % 7)); };
+  const today = () => ymd(new Date());
+  const dl = k => parse(k).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+  const dlong = k => parse(k).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+  const f1 = n => String(Math.round(n * 100) / 100);
+
+  // ---------- State ----------
+  const S = { swaps: [], absences: {}, db: null };
+  let me = "", tab = "week", wk = 0, mo = 0, modal = null, copyText = "";
+  try { const t = localStorage.getItem("roster.tab"); if (["week", "mine", "month", "swaps"].includes(t)) tab = t; } catch (e) {}
+  if (["week", "mine", "month", "swaps"].includes(location.hash.slice(1))) tab = location.hash.slice(1);
+
+  // Effective roster: regular pattern, then accepted swaps in the order they were accepted.
+  function roster() {
+    const ov = {};
+    S.swaps.filter(s => s.status === "accepted")
+      .sort((a, b) => (a.decidedAt || "").localeCompare(b.decidedAt || ""))
+      .forEach(s => { ov[s.fromDate] = s.toStaff; if (s.toDate) ov[s.toDate] = s.fromStaff; });
+    return k => { const d = parse(k); return isWeekday(d) ? (ov[k] || REGULAR[d.getDay()]) : null; };
+  }
+  const regular = k => REGULAR[parse(k).getDay()] || null;
+  const pendingOn = k => S.swaps.find(s => s.status === "pending" && (s.fromDate === k || s.toDate === k));
+  const pendingForMe = () => S.swaps.filter(s => s.status === "pending" && (me === "manager" || s.toStaff === me));
+  function upcoming(id, weeks = LOOKAHEAD_WEEKS, backWeeks = 0) {
+    const who = roster(), out = [], start = new Date();
+    for (let i = -backWeeks * 7; i < weeks * 7; i++) { const k = ymd(addDays(start, i)); if (who(k) === id) out.push(k); }
+    return out;
+  }
+
+  // ---------- Helpers ----------
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let tt;
+  function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2800); }
+  function status(m, err) { const s = $("status"); s.textContent = m; s.hidden = !m; s.classList.toggle("err", !!err); }
+  async function write(fn) {
+    if (!S.db) { toast("Not connected. Reload the page and try again."); return false; }
+    try { await fn(); return true; }
+    catch (e) {
+      toast(e && e.code === "42501" ? "You don't have permission to make that change." : e && e.message && /status of a swap/.test(e.message) ? "Only the status of a request can be changed." : "Couldn't save. Check your connection and try again.");
+      return false;
+    }
+  }
+  const shiftCell = () => `<div class="sh">${START}–${FINISH}<small>${PAID}h · ${BREAK}m break</small></div>`;
+  function swapLine(s) {
+    const byMgr = s.createdBy === "manager";
+    return s.toDate
+      ? `<strong>${esc(STAFF[s.fromStaff].first)}</strong> ${byMgr ? "swapped" : "gives"} ${dlong(s.fromDate)} ${byMgr ? "with" : "and takes"} <strong>${esc(STAFF[s.toStaff].first)}</strong>'s ${dlong(s.toDate)}`
+      : byMgr ? `<strong>${esc(STAFF[s.toStaff].first)}</strong> covers <strong>${esc(STAFF[s.fromStaff].first)}</strong>'s ${dlong(s.fromDate)}`
+      : `<strong>${esc(STAFF[s.fromStaff].first)}</strong> asks <strong>${esc(STAFF[s.toStaff].first)}</strong> to cover ${dlong(s.fromDate)}`;
+  }
+
+  // ---------- Tabs ----------
+  function renderTabs() {
+    const n = pendingForMe().length;
+    const ico = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+    const T = [
+      ["week", "Week", "Week", ico('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>')],
+      ["mine", "My shifts", "Mine", ico('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>')],
+      ["month", "Month & payroll", "Month", ico('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9 9v12M15 9v12M3 15h18"/>')],
+      ["swaps", "Swaps", "Swaps", ico('<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>')],
+    ];
+    $("tabs").innerHTML = T.map(([v, l, sm, ic]) => `<button class="${tab === v ? "on" : ""}" data-a="tab" data-v="${v}" ${tab === v ? 'aria-current="page"' : ""}>${ic}<span class="lg">${l}</span><span class="sm">${sm}</span>${v === "swaps" && n ? `<span class="badge">${n}</span>` : ""}</button>`).join("");
+  }
+
+  // ---------- Week ----------
+  function renderWeek() {
+    const mon = mondayOf(addDays(new Date(), wk * 7));
+    const ds = DAYS.map((_, i) => ymd(addDays(mon, i)));
+    const who = roster();
+    let h = `<div class="bar"><button data-a="wk" data-v="-1" aria-label="Previous week">‹</button><strong class="rng">${dl(ds[0])} – ${dl(ds[4])}</strong><button data-a="wk" data-v="1" aria-label="Next week">›</button>${wk ? `<button data-a="wk" data-v="0">This week</button>` : ""}</div>`;
+    h += weekList(ds, who);
+    h += `<div class="wrap only-d"><table><tr><th class="n">Staff</th>`;
+    ds.forEach((k, i) => h += `<th class="${k === today() ? "today" : ""}">${DAYS[i]}<small>${dl(k)}</small></th>`);
+    h += `<th>Week hrs</th></tr>`;
+    const cover = ds.map(() => 0);
+    IDS.forEach(id => {
+      let t = 0;
+      h += `<tr><td class="n"><strong><i class="dot d-${id}"></i>${esc(STAFF[id].name)}</strong></td>`;
+      ds.forEach((k, i) => {
+        if (who(k) !== id) { h += `<td><span class="off">–</span></td>`; return; }
+        const abs = S.absences[k], sw = regular(k) !== id, pend = pendingOn(k);
+        const clickable = me === "manager" || (me === id && k >= today() && !pend && !abs);
+        const cls = [clickable ? "c" : "", sw ? "ed" : "", pend ? "pend" : ""].join(" ");
+        const attrs = clickable ? ` data-a="cell" data-d="${k}" tabindex="0" role="button"` : "";
+        if (abs) h += `<td class="${cls}"${attrs}><div class="nw">Not worked<small>${esc(abs.reason || "")}</small></div></td>`;
+        else { t += PAID; cover[i]++; h += `<td class="${cls}"${attrs}>${shiftCell()}</td>`; }
+      });
+      h += `<td class="tot">${f1(t)}</td></tr>`;
+    });
+    h += `<tr class="cov"><td class="n">Desk cover</td>${cover.map(c => `<td class="${c ? "" : "z"}">${c ? c + " on" : "Nobody"}</td>`).join("")}<td></td></tr></table></div>`;
+    h += `<p class="note">${
+      me === "manager" ? "Tap a shift to swap it, reassign it, or mark it as not worked."
+      : me ? "Tap one of your upcoming shifts to swap it or ask someone to cover."
+      : "Choose your name at the top to swap your shifts."
+    } <span class="only-d">Outlined cells are swapped; dashed cells have a swap waiting for an answer.</span><span class="only-m">Swipe left or right to change week.</span></p>`;
+    return h;
+  }
+  // Phone layout: one row per day instead of the staff × day grid.
+  function weekList(ds, who) {
+    let h = `<div class="wrap mlist only-m">`;
+    const hrs = Object.fromEntries(IDS.map(id => [id, 0]));
+    ds.forEach((k, i) => {
+      const id = who(k), abs = S.absences[k], sw = regular(k) !== id, pend = pendingOn(k);
+      const clickable = me === "manager" || (me === id && k >= today() && !pend && !abs);
+      if (!abs) hrs[id] += PAID;
+      const tags = [];
+      if (sw) tags.push(`<span class="tag">Swapped from ${esc(STAFF[regular(k)].first)}</span>`);
+      if (pend) tags.push(`<span class="tag a">Swap pending</span>`);
+      if (abs) tags.push(`<span class="tag w">Not worked · ${esc(abs.reason || "")}</span>`);
+      const cls = `mday${k === today() ? " is-today" : ""}${pend ? " pend" : sw ? " sw" : ""}${clickable ? " c" : ""}`;
+      const inner = `<span class="dd"><b>${DAYS[i]}</b><span>${parse(k).getDate()}</span></span>
+        <span class="dm"><strong><i class="dot d-${id}"></i>${esc(STAFF[id].name)}${me === id ? " (you)" : ""}</strong><small>${START}–${FINISH} · ${PAID}h paid</small>${tags.length ? `<span class="tg">${tags.join("")}</span>` : ""}</span>
+        ${clickable ? `<span class="chev" aria-hidden="true">›</span>` : ""}`;
+      h += clickable ? `<button class="${cls}" data-a="cell" data-d="${k}" aria-label="${dlong(k)}, ${esc(STAFF[id].name)}">${inner}</button>` : `<div class="${cls}">${inner}</div>`;
+    });
+    h += `</div><div class="whrs only-m">Week hours: ${IDS.map(id => `<span><i class="dot d-${id}"></i>${esc(STAFF[id].first)} <b>${f1(hrs[id])}</b></span>`).join("")}</div>`;
+    return h;
+  }
+
+  // ---------- My shifts ----------
+  function incomingHtml() {
+    const reqs = pendingForMe();
+    if (!reqs.length) return "";
+    return `<div class="alert"><strong>${reqs.length === 1 ? "1 swap request needs your answer" : reqs.length + " swap requests need your answer"}</strong>${reqs.map(reqRow).join("")}</div>`;
+  }
+  function renderMine() {
+    if (!me) return `<div class="wrap pad"><p class="off">Choose your name at the top to see your shifts. This device will remember it.</p></div>`;
+    if (me === "manager") return incomingHtml() + `<div class="wrap pad"><p class="off">Manager view has no personal shifts. Use the Week and Month tabs to see everyone, or Swaps to answer requests.</p></div>`;
+    const who = roster(), list = upcoming(me);
+    let h = incomingHtml();
+    h += `<div class="bar"><strong>${esc(STAFF[me].name)}</strong><span class="off">· ${list.length} shifts in the next ${LOOKAHEAD_WEEKS} weeks · ${f1(list.filter(k => !S.absences[k]).length * PAID)} paid hours</span></div><div class="wrap pad">`;
+    let last = null;
+    list.forEach(k => {
+      const w = ymd(mondayOf(parse(k)));
+      if (w !== last) { h += `<div class="wk">Week of ${dl(w)}</div>`; last = w; }
+      const abs = S.absences[k], pend = pendingOn(k), reg = regular(k);
+      const tags = [];
+      if (reg !== me) {
+        const s = S.swaps.filter(x => x.status === "accepted" && ((x.fromDate === k && x.toStaff === me) || (x.toDate === k && x.fromStaff === me))).pop();
+        tags.push(`<span class="tag">${s && !s.toDate ? "Covering for" : "Swapped from"} ${esc(STAFF[reg].first)}</span>`);
+      }
+      if (abs) tags.push(`<span class="tag w">Not worked · ${esc(abs.reason || "")}</span>`);
+      if (pend) tags.push(`<span class="tag a">Swap pending</span>`);
+      h += `<div class="rq"><span class="d">${dlong(k)}</span><span class="off">${START}–${FINISH}</span>${tags.join("")}<span class="sp"></span>${!pend && !abs ? `<button data-a="cell" data-d="${k}">Swap or give away</button>` : ""}</div>`;
+    });
+    if (!list.length) h += `<p class="off">No shifts in the next few weeks.</p>`;
+    return h + `</div>`;
+  }
+
+  // ---------- Month & payroll ----------
+  function monthDays() {
+    const n = new Date(), f = new Date(n.getFullYear(), n.getMonth() + mo, 1, 12), out = [];
+    for (let d = new Date(f); d.getMonth() === f.getMonth(); d = addDays(d, 1)) if (isWeekday(d)) out.push(ymd(d));
+    return { days: out, label: f.toLocaleDateString("en-AU", { month: "long", year: "numeric" }) };
+  }
+  function payroll(days) {
+    const who = roster(), r = Object.fromEntries(IDS.map(id => [id, { shifts: 0, in: 0, out: 0, off: 0 }]));
+    days.forEach(k => {
+      const s = who(k), reg = regular(k);
+      if (S.absences[k]) { r[s].off++; return; }
+      r[s].shifts++;
+      if (s !== reg) { r[s].in++; r[reg].out++; }
+    });
+    return r;
+  }
+  function renderMonth() {
+    const { days, label } = monthDays(), who = roster(), P = payroll(days);
+    let h = `<div class="bar"><button data-a="mo" data-v="-1" aria-label="Previous month">‹</button><strong class="rng">${label}</strong><button data-a="mo" data-v="1" aria-label="Next month">›</button>${mo ? `<button data-a="mo" data-v="0">This month</button>` : ""}<span class="sp only-d"></span><button class="grow" data-a="copy">Copy summary</button><button class="grow" data-a="csv">Export CSV</button></div>`;
+    h += `<div class="tiles">${IDS.map(id => `<div class="tile"><div class="nm"><i class="dot d-${id}"></i>${esc(STAFF[id].first)}</div><div class="hv">${f1(P[id].shifts * PAID)}<small>h</small></div><div class="mt">${P[id].shifts} shift${P[id].shifts === 1 ? "" : "s"}${P[id].off ? ` · ${P[id].off} off` : ""}</div></div>`).join("")}</div>`;
+    h += `<div class="wrap mt-tbl"><table><tr><th class="n">Date</th>${IDS.map(id => `<th><span class="ln">${esc(STAFF[id].name)}</span><span class="fn">${esc(STAFF[id].first)}</span></th>`).join("")}<th class="hm">Day total</th></tr>`;
+    days.forEach(k => {
+      const s = who(k), abs = S.absences[k], sw = s !== regular(k);
+      h += `<tr class="${k === today() ? "today" : ""}"><td class="n">${dlong(k)}</td>`;
+      IDS.forEach(id => {
+        if (id !== s) { h += `<td><span class="off">–</span></td>`; return; }
+        const click = me === "manager" ? ` class="c${sw ? " ed" : ""}" data-a="cell" data-d="${k}" tabindex="0" role="button"` : (sw ? ` class="ed"` : "");
+        h += abs ? `<td${click}><span class="nw">${esc(abs.reason || "Not worked")}</span></td>` : `<td${click}>${f1(PAID)}</td>`;
+      });
+      h += `<td class="tot hm">${abs ? "–" : f1(PAID)}</td></tr>`;
+    });
+    const totShifts = IDS.reduce((a, id) => a + P[id].shifts, 0);
+    h += `<tr class="cov"><td class="n">Swapped in / out</td>${IDS.map(id => `<td>${P[id].in} / ${P[id].out}</td>`).join("")}<td class="hm"></td></tr>`;
+    h += `<tr class="cov"><td class="n">Not worked</td>${IDS.map(id => `<td class="${P[id].off ? "z" : ""}">${P[id].off || "–"}</td>`).join("")}<td class="hm"></td></tr>`;
+    h += `<tr class="cov"><td class="n">Shifts worked</td>${IDS.map(id => `<td>${P[id].shifts}</td>`).join("")}<td class="hm">${totShifts}</td></tr>`;
+    h += `<tr><td class="n tot">Paid hours</td>${IDS.map(id => `<td class="tot">${f1(P[id].shifts * PAID)}</td>`).join("")}<td class="tot hm">${f1(totShifts * PAID)}</td></tr></table></div>`;
+    h += `<p class="note">Paid hours exclude the 30 minute unpaid break. Weekdays only, based on the roster after swaps. Days marked not worked are left out.${me === "manager" ? " Tap a shift to swap, reassign or mark it as not worked." : ""} Outlined cells are swapped days.</p>`;
+    if (copyText) h += `<textarea class="copy" id="copyBox" readonly aria-label="Payroll summary">${esc(copyText)}</textarea>`;
+    return h;
+  }
+  function summaryText() {
+    const { days, label } = monthDays(), P = payroll(days);
+    return [`Toolbox Clinic admin payroll: ${label}`, `Shift ${START}-${FINISH}, ${BREAK} min unpaid break = ${PAID} paid hours`, "",
+      ...IDS.map(id => `${STAFF[id].name}: ${P[id].shifts} shifts, ${f1(P[id].shifts * PAID)} hours${P[id].off ? ` (${P[id].off} not worked)` : ""}`)].join("\n");
+  }
+  async function exportCsv() {
+    const { days } = monthDays(), who = roster();
+    const rows = ["Name,Date,Day,Start,Finish,Break mins,Paid hours,Note"];
+    days.forEach(k => {
+      const s = who(k), abs = S.absences[k], note = abs ? `Not worked: ${abs.reason || ""}` : (s !== regular(k) ? `Swapped from ${STAFF[regular(k)].name}` : "");
+      rows.push([`"${STAFF[s].name}"`, k, DAYS[parse(k).getDay() - 1], START, FINISH, BREAK, abs ? 0 : PAID, `"${note}"`].join(","));
+    });
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `admin-roster-${days[0].slice(0, 7)}.csv`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ---------- Swaps ----------
+  function reqRow(s) {
+    const st = { pending: `<span class="tag a">Waiting</span>`, accepted: s.createdBy === "manager" ? `<span class="tag">Manager change</span>` : `<span class="tag">Accepted</span>`, declined: `<span class="tag w">Declined</span>`, cancelled: `<span class="tag m">Withdrawn</span>` }[s.status];
+    let btns = "";
+    if (s.status === "pending") {
+      if (me === s.toStaff || me === "manager") btns += `<button class="p" data-a="decide" data-v="accepted" data-i="${s.id}">Accept</button><button data-a="decide" data-v="declined" data-i="${s.id}">Decline</button>`;
+      if (me === s.fromStaff) btns += `<button class="x" data-a="decide" data-v="cancelled" data-i="${s.id}">Withdraw</button>`;
+      if (!btns) btns = `<span class="off">Waiting on ${esc(STAFF[s.toStaff].first)}</span>`;
+    }
+    return `<div class="rq">${st}<span>${swapLine(s)}</span><span class="sp"></span>${btns}${s.note ? `<span class="q">“${esc(s.note)}”</span>` : ""}</div>`;
+  }
+  function renderSwaps() {
+    const P = S.swaps.filter(s => s.status === "pending").sort((a, b) => a.fromDate.localeCompare(b.fromDate));
+    const D = S.swaps.filter(s => s.status !== "pending").sort((a, b) => (b.decidedAt || "").localeCompare(a.decidedAt || "")).slice(0, 40);
+    let h = `<div class="bar"><strong>Waiting for an answer</strong></div><div class="wrap pad">`;
+    h += P.length ? P.map(reqRow).join("") : `<p class="off">No open requests. Tap one of your shifts on the Week or My shifts tab to start one.</p>`;
+    h += `</div><div class="bar" style="margin-top:16px"><strong>History</strong></div><div class="wrap pad">`;
+    h += D.length ? D.map(s => reqRow(s).replace('<div class="rq">', `<div class="rq"><span class="off" style="min-width:64px">${s.decidedAt ? dl(ymd(new Date(s.decidedAt))) : ""}</span>`)).join("") : `<p class="off">Accepted, declined and withdrawn requests will be listed here.</p>`;
+    return h + `</div>`;
+  }
+  async function decide(id, status) {
+    const s = S.swaps.find(x => x.id === id); if (!s) return;
+    if (status === "accepted") {
+      const who = roster();
+      if (s.fromDate < today()) { toast("That shift has already passed"); return; }
+      if (who(s.fromDate) !== s.fromStaff || (s.toDate && who(s.toDate) !== s.toStaff)) { toast("The roster changed since this was asked. Decline it and send a new request."); return; }
+    }
+    if (await write(() => S.db.doc("swaps/" + id).update({ status, decidedAt: new Date().toISOString(), decidedBy: me })))
+      toast({ accepted: "Swap accepted. The roster is updated.", declined: "Request declined", cancelled: "Request withdrawn" }[status]);
+  }
+
+  // ---------- Modals ----------
+  // Shared swap fields. `from` is the person giving up the shift on day k.
+  function swapFields(from, mgr) {
+    const others = IDS.filter(id => id !== from);
+    return `<label for="sw1">${mgr ? "Swap with" : "Ask"}</label><select id="sw1">${others.map(id => `<option value="${id}">${esc(STAFF[id].name)}</option>`).join("")}</select>
+      <label class="r"><input type="radio" name="kind" id="kSwap" checked> ${mgr ? `Swap: ${esc(STAFF[from].first)} works one of their shifts instead` : "Swap: I take one of their shifts"}</label>
+      <label class="r"><input type="radio" name="kind" id="kCover"> ${mgr ? "Cover: they work this shift, nothing back" : "Cover: they take mine, nothing back"}</label>
+      <div id="theirs"><label for="sw2">${mgr ? `Their shift ${esc(STAFF[from].first)} works instead` : "Their shift I'll work instead"}</label><select id="sw2"></select></div>
+      <label for="sw3">Note (optional)</label><textarea id="sw3" maxlength="300" placeholder="${mgr ? "e.g. Justin away for training" : "e.g. Specialist appointment that morning"}"></textarea>`;
+  }
+  function swapModal(k) {
+    return `<div class="ov" data-a="bg"><div class="md" role="dialog" aria-modal="true" aria-labelledby="mdh">
+      <h2 id="mdh">Swap ${dlong(k)}</h2><p class="ctx">${esc(STAFF[me].name)} · ${START}–${FINISH}</p>
+      ${swapFields(me, false)}
+      <div class="row"><button class="p" data-a="send">Send request</button><button data-a="close">Cancel</button></div></div></div>`;
+  }
+  function fillTheirs() {
+    const sel = $("sw2"); if (!sel || !modal) return;
+    const mgr = modal.type === "day";
+    const busy = new Set(S.swaps.filter(s => s.status === "pending").flatMap(s => [s.fromDate, s.toDate]));
+    // The manager can also fix up recent past weeks for payroll.
+    const list = upcoming($("sw1").value, LOOKAHEAD_WEEKS, mgr ? 4 : 0).filter(d => d !== modal.k && !busy.has(d) && !S.absences[d]);
+    sel.innerHTML = list.length ? list.map(d => `<option value="${d}">${dlong(d)}${d < today() ? " (past)" : ""}</option>`).join("") : `<option value="">No free shifts nearby</option>`;
+    if (mgr) { const next = list.find(d => d >= today()); if (next) sel.value = next; }
+    $("theirs").hidden = $("kCover").checked;
+  }
+  function dayModal(k) {
+    const s = roster()(k), abs = S.absences[k], pend = pendingOn(k);
+    let body;
+    if (abs) body = `<p>Marked as not worked: <strong>${esc(abs.reason || "")}</strong></p><div class="row"><button class="p" data-a="worked">Mark as worked</button><button data-a="close">Cancel</button></div>`;
+    else {
+      body = pend
+        ? `<p class="alert" style="margin:10px 0 0">A swap request is waiting on this day. Answer it on the Swaps tab before changing this shift.</p>`
+        : `<h2 style="margin-top:14px;font-size:14px">Swap or reassign</h2>${swapFields(s, true)}
+           <div class="row"><button class="p" data-a="mswap">Save change</button></div>`;
+      body += `<h2 style="margin-top:18px;font-size:14px">Not worked</h2>
+        <label for="rs">Reason</label><select id="rs">${REASONS.map(r => `<option>${r}</option>`).join("")}</select>
+        <div class="row"><button data-a="absent">Mark as not worked</button><button data-a="close">Close</button></div>`;
+    }
+    return `<div class="ov" data-a="bg"><div class="md" role="dialog" aria-modal="true" aria-labelledby="mdh">
+      <h2 id="mdh">${esc(STAFF[s].name)} · ${dlong(k)}</h2><p class="ctx">${START}–${FINISH} · ${PAID} paid hours${s !== regular(k) ? ` · swapped from ${esc(STAFF[regular(k)].first)}` : ""}</p>
+      ${body}</div></div>`;
+  }
+  function openCell(k) {
+    if (me === "manager") modal = { type: "day", k };
+    else if (STAFF[me] && roster()(k) === me && k >= today()) modal = { type: "swap", k };
+    else return;
+    renderModal();
+  }
+  function renderModal() {
+    const m = $("modal");
+    if (!modal) { m.innerHTML = ""; return; }
+    m.innerHTML = modal.type === "swap" ? swapModal(modal.k) : dayModal(modal.k);
+    if (m.querySelector("#sw2")) fillTheirs();
+    const f = m.querySelector("select, button"); if (f) f.focus();
+  }
+
+  // ---------- Render ----------
+  function render() {
+    if (!me) return;
+    renderTabs();
+    $("view").innerHTML = tab === "week" ? renderWeek() : tab === "mine" ? renderMine() : tab === "month" ? renderMonth() : renderSwaps();
+  }
+
+  // ---------- Events ----------
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && modal) { modal = null; renderModal(); }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("td[data-a=cell]")) { e.preventDefault(); openCell(e.target.dataset.d); }
+  });
+  document.addEventListener("change", e => { if (e.target.id === "sw1" || e.target.name === "kind") fillTheirs(); });
+  document.addEventListener("click", async e => {
+    if (e.target.dataset && e.target.dataset.a === "bg") { modal = null; renderModal(); return; }
+    const t = e.target.closest("[data-a]"); if (!t) return;
+    const a = t.dataset.a;
+    if (a === "tab") { tab = t.dataset.v; copyText = ""; try { localStorage.setItem("roster.tab", tab); } catch (x) {} render(); }
+    else if (a === "wk") { wk = t.dataset.v === "0" ? 0 : wk + +t.dataset.v; render(); }
+    else if (a === "mo") { mo = t.dataset.v === "0" ? 0 : mo + +t.dataset.v; copyText = ""; render(); }
+    else if (a === "cell") openCell(t.dataset.d);
+    else if (a === "close") { modal = null; renderModal(); }
+    else if (a === "decide") decide(t.dataset.i, t.dataset.v);
+    else if (a === "csv") exportCsv();
+    else if (a === "copy") {
+      const text = summaryText();
+      const fallback = () => { copyText = text; render(); const b = $("copyBox"); if (b) { b.focus(); b.select(); } toast("Select the text below and copy it"); };
+      try { navigator.clipboard.writeText(text).then(() => toast("Payroll summary copied"), fallback); } catch (x) { fallback(); }
+    }
+    else if (a === "send") {
+      const cover = $("kCover").checked, toDate = cover ? null : $("sw2").value;
+      if (!cover && !toDate) { toast("Pick one of their shifts, or choose Cover instead"); return; }
+      const doc = { fromStaff: me, fromDate: modal.k, toStaff: $("sw1").value, toDate, status: "pending",
+        note: $("sw3").value.trim().slice(0, 300), createdAt: new Date().toISOString(), decidedAt: null, createdBy: me };
+      if (await write(() => S.db.collection("swaps").add(doc))) { modal = null; renderModal(); toast(`Request sent to ${STAFF[doc.toStaff].first}`); render(); }
+    }
+    else if (a === "mswap") {
+      const k = modal.k, who = roster(), from = who(k), to = $("sw1").value;
+      const cover = $("kCover").checked, toDate = cover ? null : $("sw2").value;
+      if (!cover && !toDate) { toast("Pick one of their shifts, or choose Cover instead"); return; }
+      if (toDate && who(toDate) !== to) { toast("That shift has changed. Close and try again."); return; }
+      const now = new Date().toISOString();
+      const doc = { fromStaff: from, fromDate: k, toStaff: to, toDate, status: "accepted",
+        note: $("sw3").value.trim().slice(0, 300), createdAt: now, decidedAt: now, createdBy: "manager", decidedBy: "manager" };
+      if (await write(() => S.db.collection("swaps").add(doc))) {
+        modal = null; renderModal();
+        toast(toDate ? `Swapped ${STAFF[from].first} and ${STAFF[to].first}` : `${STAFF[to].first} now covers ${dlong(k)}`);
+      }
+    }
+    else if (a === "absent") {
+      const k = modal.k, reason = $("rs").value;
+      if (await write(() => S.db.doc("absences/" + k).set({ reason, staff: roster()(k), updatedAt: new Date().toISOString() }))) { modal = null; renderModal(); toast(`${dlong(k)} marked as not worked`); }
+    }
+    else if (a === "worked") {
+      const k = modal.k;
+      if (await write(() => S.db.doc("absences/" + k).delete())) { modal = null; renderModal(); toast("Shift restored"); }
+    }
+  });
+
+  // Swipe left/right on the Week and Month tabs to move between periods.
+  let tx = null, ty = 0;
+  $("view").addEventListener("touchstart", e => { if (e.touches.length === 1) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } }, { passive: true });
+  $("view").addEventListener("touchend", e => {
+    if (tx === null || modal) return;
+    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > 40) return;
+    if (e.target.closest(".mt-tbl")) return;
+    const step = dx < 0 ? 1 : -1;
+    if (tab === "week") { wk += step; render(); }
+    else if (tab === "month") { mo += step; copyText = ""; render(); }
+  }, { passive: true });
+
+  // ---------- Supabase ----------
+  const cfg = window.ROSTER_CONFIG || {};
+  if (!window.supabase || !cfg.supabaseUrl || /YOUR_/.test(cfg.supabaseUrl)) {
+    status("This roster isn't connected to its database yet. Add the Supabase details to config.js.", true);
+    return;
+  }
+  const supa = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  const snake = { fromStaff: "from_staff", fromDate: "from_date", toStaff: "to_staff", toDate: "to_date", createdAt: "created_at", createdBy: "created_by", decidedAt: "decided_at", decidedBy: "decided_by", status: "status", note: "note" };
+  const toRow = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [snake[k] || k, v]));
+  const fromRow = r => ({ id: r.id, fromStaff: r.from_staff, fromDate: r.from_date, toStaff: r.to_staff, toDate: r.to_date, status: r.status, note: r.note || "", createdAt: r.created_at, createdBy: r.created_by, decidedAt: r.decided_at, decidedBy: r.decided_by });
+  const ok = ({ error }) => { if (error) throw error; };
+  // Same small interface the page used before, backed by Supabase tables.
+  const dbShim = {
+    collection: name => ({ add: async doc => { ok(await supa.from(name).insert(toRow(doc))); await load(); } }),
+    doc: path => {
+      const [table, id] = path.split("/");
+      const key = table === "absences" ? "date" : "id";
+      return {
+        update: async data => { ok(await supa.from(table).update(toRow(data)).eq(key, id)); await load(); },
+        set: async data => { ok(await supa.from(table).upsert({ [key]: id, reason: data.reason, staff: data.staff, updated_at: data.updatedAt })); await load(); },
+        delete: async () => { ok(await supa.from(table).delete().eq(key, id)); await load(); },
+      };
+    },
+  };
+
+  async function load() {
+    const [sw, ab] = await Promise.all([
+      supa.from("swaps").select("*").order("created_at"),
+      supa.from("absences").select("*"),
+    ]);
+    if (sw.error || ab.error) { status("Couldn't load the roster. Check your connection and reload.", true); return; }
+    S.swaps = sw.data.map(fromRow);
+    S.absences = Object.fromEntries(ab.data.map(r => [r.date, { reason: r.reason, staff: r.staff, updatedAt: r.updated_at }]));
+    status("");
+    render();
+  }
+
+  let channel = null;
+  function showSignedOut(msg) {
+    me = ""; S.db = null;
+    $("tabs").innerHTML = ""; $("view").innerHTML = ""; $("who").hidden = true;
+    $("signin").hidden = false; $("emailForm").hidden = false; $("codeForm").hidden = true;
+    $("signinMsg").textContent = msg || "";
+    status("");
+    if (channel) { supa.removeChannel(channel); channel = null; }
+  }
+  async function start(session) {
+    if (!session) return showSignedOut();
+    const { data, error } = await supa.from("staff_access").select("role").maybeSingle();
+    if (error) { status("Couldn't check your access. Reload the page to try again.", true); return; }
+    if (!data) {
+      await supa.auth.signOut();
+      return showSignedOut(`${session.user.email} isn't on the roster. Ask the manager to add you.`);
+    }
+    me = data.role; S.db = dbShim;
+    $("signin").hidden = true;
+    const who = $("who"); who.hidden = false;
+    who.innerHTML = `<span>Signed in as <span class="me">${esc(me === "manager" ? "Manager" : STAFF[me].name)}</span></span><button id="signout">Sign out</button>`;
+    $("signout").onclick = () => supa.auth.signOut();
+    status("Loading the roster…");
+    await load();
+    if (!channel) {
+      channel = supa.channel("roster")
+        .on("postgres_changes", { event: "*", schema: "public", table: "swaps" }, () => load())
+        .on("postgres_changes", { event: "*", schema: "public", table: "absences" }, () => load())
+        .subscribe();
+    }
+  }
+  // Phones pause pages in the background; refresh when the roster is opened again.
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && me) load(); });
+
+  let pendingEmail = "";
+  $("emailForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    pendingEmail = $("email").value.trim().toLowerCase();
+    const btn = e.target.querySelector("button"); btn.disabled = true;
+    const { error } = await supa.auth.signInWithOtp({ email: pendingEmail, options: { emailRedirectTo: location.origin + location.pathname } });
+    btn.disabled = false;
+    if (error) { $("signinMsg").textContent = /rate/i.test(error.message) ? "Too many sign-in emails requested. Wait a few minutes and try again." : "Couldn't send the email: " + error.message; return; }
+    $("emailForm").hidden = true; $("codeForm").hidden = false;
+    $("sentMsg").innerHTML = `We've emailed a sign-in link to <strong>${esc(pendingEmail)}</strong>. Open it on this phone or computer and you'll be signed in.`;
+    $("signinMsg").textContent = "The email can take a minute to arrive. Check your spam folder if it doesn't.";
+  });
+  $("codeForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!$("code").value.trim()) { $("signinMsg").textContent = "Open the link in the email, or type the code if the email has one."; return; }
+    const btn = e.target.querySelector("button.p"); btn.disabled = true;
+    const { error } = await supa.auth.verifyOtp({ email: pendingEmail, token: $("code").value.trim(), type: "email" });
+    btn.disabled = false;
+    if (error) $("signinMsg").textContent = "That code didn't work. Check it, or use a different email to get a new one.";
+  });
+  $("restart").addEventListener("click", () => showSignedOut());
+
+  supa.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" || event === "INITIAL_SESSION") setTimeout(() => start(session), 0);
+    else if (event === "SIGNED_OUT") showSignedOut("You're signed out.");
+  });
+})();
+</script>
+</body>
+</html>
