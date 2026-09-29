@@ -161,9 +161,13 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   <div id="status" class="status">Loading…</div>
   <section id="signin" class="signin" hidden>
     <form id="emailForm" style="display:grid;gap:10px">
-      <label for="email">Sign in with your email to see the roster</label>
-      <input id="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
-      <button class="p" type="submit">Email me a sign-in link</button>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" inputmode="email" required placeholder="you@example.com">
+      <label for="password">Password <span style="font-weight:400">(once you've set one)</span></label>
+      <input id="password" type="password" autocomplete="current-password">
+      <button class="p" type="submit">Sign in</button>
+      <button type="button" id="sendLink">Email me a sign-in link instead</button>
+      <p class="note" style="margin:0">First time here? Enter your email and tap <strong>Email me a sign-in link</strong>. Once you're in, tap <strong>Set password</strong> at the top so you can sign in with a password next time.</p>
     </form>
     <form id="codeForm" style="display:grid;gap:10px" hidden>
       <p id="sentMsg" style="margin:0"></p>
@@ -628,8 +632,9 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     me = data.role; S.db = dbShim;
     $("signin").hidden = true;
     const who = $("who"); who.hidden = false;
-    who.innerHTML = `<span>Signed in as <span class="me">${esc(me === "manager" ? "Manager" : STAFF[me].name)}</span></span><button id="signout">Sign out</button>`;
+    who.innerHTML = `<span>Signed in as <span class="me">${esc(me === "manager" ? "Manager" : STAFF[me].name)}</span></span><span style="display:flex;gap:6px"><button id="setpw">Set password</button><button id="signout">Sign out</button></span>`;
     $("signout").onclick = () => supa.auth.signOut();
+    $("setpw").onclick = () => openPasswordModal(session.user.email);
     status("Loading the roster…");
     await load();
     if (!channel) {
@@ -643,17 +648,57 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && me) load(); });
 
   let pendingEmail = "";
-  $("emailForm").addEventListener("submit", async e => {
-    e.preventDefault();
+  async function sendLink() {
     pendingEmail = $("email").value.trim().toLowerCase();
-    const btn = e.target.querySelector("button"); btn.disabled = true;
+    if (!pendingEmail || !$("email").checkValidity()) { $("signinMsg").textContent = "Enter your email address first."; $("email").focus(); return; }
+    const btn = $("sendLink"); btn.disabled = true;
     const { error } = await supa.auth.signInWithOtp({ email: pendingEmail, options: { emailRedirectTo: location.origin + location.pathname } });
     btn.disabled = false;
     if (error) { $("signinMsg").textContent = /rate/i.test(error.message) ? "Too many sign-in emails requested. Wait a few minutes and try again." : "Couldn't send the email: " + error.message; return; }
     $("emailForm").hidden = true; $("codeForm").hidden = false;
     $("sentMsg").innerHTML = `We've emailed a sign-in link to <strong>${esc(pendingEmail)}</strong>. Open it on this phone or computer and you'll be signed in.`;
     $("signinMsg").textContent = "The email can take a minute to arrive. Check your spam folder if it doesn't.";
+  }
+  $("sendLink").addEventListener("click", sendLink);
+  $("emailForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = $("email").value.trim().toLowerCase(), password = $("password").value;
+    if (!password) { $("signinMsg").textContent = "Enter your password, or tap “Email me a sign-in link instead”."; $("password").focus(); return; }
+    const btn = e.target.querySelector("button.p"); btn.disabled = true;
+    const { error } = await supa.auth.signInWithPassword({ email, password });
+    btn.disabled = false;
+    if (error) $("signinMsg").textContent = /invalid/i.test(error.message)
+      ? "That email and password don't match. If you haven't set a password yet, use a sign-in link."
+      : "Couldn't sign in: " + error.message;
   });
+
+  function openPasswordModal(email) {
+    const m = $("modal");
+    m.innerHTML = `<div class="ov" data-a="bg"><div class="md" role="dialog" aria-modal="true" aria-labelledby="pwh">
+      <h2 id="pwh">Set a password</h2><p class="ctx">Next time, sign in with ${esc(email)} and this password instead of an email link.</p>
+      <form id="pwForm">
+        <input type="email" autocomplete="username" value="${esc(email)}" hidden readonly>
+        <label for="pw1">New password (at least 8 characters)</label><input id="pw1" type="password" autocomplete="new-password" minlength="8" required>
+        <label for="pw2">Type it again</label><input id="pw2" type="password" autocomplete="new-password" minlength="8" required>
+        <p class="note" id="pwMsg" style="color:var(--warn)"></p>
+        <div class="row"><button class="p" type="submit">Save password</button><button type="button" data-a="close">Cancel</button></div>
+      </form></div></div>`;
+    modal = { type: "password" };
+    $("pw1").focus();
+    $("pwForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const p1 = $("pw1").value, p2 = $("pw2").value;
+      if (p1.length < 8) { $("pwMsg").textContent = "Use at least 8 characters."; return; }
+      if (p1 !== p2) { $("pwMsg").textContent = "The two passwords don't match."; return; }
+      const btn = e.target.querySelector("button.p"); btn.disabled = true;
+      const { error } = await supa.auth.updateUser({ password: p1 });
+      btn.disabled = false;
+      if (error) { $("pwMsg").textContent = /reauth|recent/i.test(error.message) ? "For security, sign out, sign in again with an email link, then set your password straight away." : "Couldn't save the password: " + error.message; return; }
+      modal = null; m.innerHTML = "";
+      toast("Password saved. Use it with your email next time.");
+    });
+  }
+
   $("codeForm").addEventListener("submit", async e => {
     e.preventDefault();
     if (!$("code").value.trim()) { $("signinMsg").textContent = "Open the link in the email, or type the code if the email has one."; return; }
