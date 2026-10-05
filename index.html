@@ -377,7 +377,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   }
   function renderMonth() {
     const { days, label } = monthDays(), who = roster(), P = payroll(days);
-    let h = `<div class="bar"><button data-a="mo" data-v="-1" aria-label="Previous month">‹</button><strong class="rng">${label}</strong><button data-a="mo" data-v="1" aria-label="Next month">›</button>${mo ? `<button data-a="mo" data-v="0">This month</button>` : ""}<span class="sp only-d"></span><button class="grow" data-a="copy">Copy summary</button><button class="grow" data-a="csv">Export CSV</button></div>`;
+    let h = `<div class="bar"><button data-a="mo" data-v="-1" aria-label="Previous month">‹</button><strong class="rng">${label}</strong><button data-a="mo" data-v="1" aria-label="Next month">›</button>${mo ? `<button data-a="mo" data-v="0">This month</button>` : ""}<span class="sp only-d"></span><button class="grow" data-a="copy">Copy summary</button><button class="grow" data-a="csv">Export CSV</button>${me === "manager" ? `<button class="grow p" data-a="xero">Send to Xero</button>` : ""}</div>`;
     h += `<div class="tiles">${IDS.map(id => `<div class="tile"><div class="nm"><i class="dot d-${id}"></i>${esc(STAFF[id].first)}</div><div class="hv">${f1(P[id].shifts * PAID)}<small>h</small></div><div class="mt">${P[id].shifts} shift${P[id].shifts === 1 ? "" : "s"}${P[id].off ? ` · ${P[id].off} off` : ""}</div></div>`).join("")}</div>`;
     h += `<div class="wrap mt-tbl"><table><tr><th class="n">Date</th>${IDS.map(id => `<th><span class="ln">${esc(STAFF[id].name)}</span><span class="fn">${esc(STAFF[id].first)}</span></th>`).join("")}<th class="hm">Day total</th></tr>`;
     days.forEach(k => {
@@ -498,6 +498,34 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     else return;
     renderModal();
   }
+  // ---------- Send to Xero (manager) ----------
+  // The server function works out hours from the live roster and creates DRAFT timesheets only.
+  async function sendToXero(apply) {
+    const { days, label } = monthDays(), month = days[0].slice(0, 7);
+    const m = $("modal");
+    const shell = inner => `<div class="ov" data-a="bg"><div class="md" role="dialog" aria-modal="true" aria-labelledby="xh"><h2 id="xh">Send ${esc(label)} to Xero</h2>${inner}</div></div>`;
+    modal = { type: "xero" };
+    m.innerHTML = shell(`<p class="ctx">${apply ? "Creating draft timesheets in Xero…" : "Working out hours and checking Xero…"}</p>`);
+    const { data, error } = await supa.functions.invoke("xero-timesheets", { body: { month, apply } });
+    if (!modal || modal.type !== "xero") return;
+    if (error || !data || data.error) {
+      let msg = (data && data.error) || (error && error.message) || "Unknown error";
+      try { const b = await error.context.json(); if (b && b.error) msg = b.error; } catch (x) {}
+      m.innerHTML = shell(`<p class="nw" style="margin:8px 0 0">${esc(msg)}</p><div class="row"><button data-a="close">Close</button></div>`);
+      return;
+    }
+    const ready = data.people.filter(p => p.ready && !p.created);
+    const rows = data.people.map(p => `<div class="rq" style="align-items:flex-start"><span style="flex:1;min-width:0"><strong><i class="dot d-${Object.keys(STAFF).find(k => STAFF[k].name === p.name)}"></i>${esc(p.name)}</strong><br><span class="off">${p.shifts} shifts · ${f1(p.hours)} hours</span>${p.skip ? `<br><span class="off" style="font-size:13px">${esc(p.skip)}</span>` : ""}</span>${
+      p.created ? `<span class="tag">Draft created</span>` : p.ready ? `<span class="tag a">Ready</span>` : `<span class="tag m">Skipped</span>`}</div>`).join("");
+    const off = data.notWorked.length ? `<p class="note">Not included (marked not worked): ${data.notWorked.map(n => `${esc(n.staff.split(" ")[0])} ${dlong(n.date)} (${esc(n.reason)})`).join(", ")}.</p>` : "";
+    const foot = data.applied
+      ? `<p class="note">${data.created} draft timesheet${data.created === 1 ? "" : "s"} created in ${esc(data.org)}. Review and approve them in Xero under Payroll → Timesheets.</p><div class="row"><button class="p" data-a="close">Done</button></div>`
+      : ready.length
+        ? `<p class="note">This creates <strong>draft</strong> timesheets on the Ordinary Hours rate for ${esc(dl(data.period.start))} – ${esc(dl(data.period.end))}. Nothing is approved or paid until you do that in Xero.</p><div class="row"><button class="p" data-a="xeroApply">Create ${ready.length} draft${ready.length === 1 ? "" : "s"} in Xero</button><button data-a="close">Cancel</button></div>`
+        : `<p class="note">Nothing to send for this month.</p><div class="row"><button data-a="close">Close</button></div>`;
+    m.innerHTML = shell(`<p class="ctx">${esc(data.org)} · ${esc(dl(data.period.start))} – ${esc(dl(data.period.end))}</p><div>${rows}</div>${off}${foot}`);
+  }
+
   function renderModal() {
     const m = $("modal");
     if (!modal) { m.innerHTML = ""; return; }
@@ -530,6 +558,8 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     else if (a === "close") { modal = null; renderModal(); }
     else if (a === "decide") decide(t.dataset.i, t.dataset.v);
     else if (a === "csv") exportCsv();
+    else if (a === "xero") sendToXero(false);
+    else if (a === "xeroApply") sendToXero(true);
     else if (a === "copy") {
       const text = summaryText();
       const fallback = () => { copyText = text; render(); const b = $("copyBox"); if (b) { b.focus(); b.select(); } toast("Select the text below and copy it"); };
