@@ -104,6 +104,14 @@ h2{font-size:15px;margin:0;padding:12px 0 4px}
 .mday .chev{color:var(--mute);font-size:22px;line-height:1;flex:none}
 .mday.pend{outline:0;box-shadow:inset 3px 0 0 var(--amber)}
 .mday.sw{box-shadow:inset 3px 0 0 var(--acc)}
+.xs{font-size:12px;font-weight:600;color:var(--acc);background:var(--accbg);border-radius:6px;padding:2px 6px;margin-top:4px;text-align:left}
+.xs.c:hover{outline:1px solid var(--acc)}
+.add{font-size:18px}
+.md h2.sec{font-size:14px;margin:18px 0 2px;padding-top:12px;border-top:1px solid var(--line)}
+.tf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tf label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk{color:var(--acc);font-weight:700;margin-left:1px}
+.mday .xl{display:flex;align-items:center;color:var(--acc);font-weight:600}
 .whrs{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--mute);margin-top:10px}
 .whrs b{color:var(--ink)}
 @media (max-width:640px){
@@ -116,6 +124,7 @@ h2{font-size:15px;margin:0;padding:12px 0 4px}
   .bar{gap:6px}
   .bar button{min-height:44px;min-width:44px}
   .bar .grow{flex:1 1 40%}
+  .bar .full{flex:1 1 100%;order:5}
   .bar strong.rng{flex:1;text-align:center}
   .tabs{position:fixed;left:0;right:0;bottom:0;z-index:4;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
   .tabs button{border:0;background:none;border-radius:10px;padding:6px 2px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:600;color:var(--mute);position:relative}
@@ -155,7 +164,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
 
 <main>
   <h1>Toolbox Clinic Admin Roster</h1>
-  <p class="sub">Shifts 9:00–15:00 · 30m unpaid break · 5.5 paid hours per shift</p>
+  <p class="sub">Usual shift 9am–3pm · 30m unpaid break · 5.5 paid hours</p>
   <div class="bar">
     <nav id="tabs" class="tabs" aria-label="Sections"></nav>
     <span class="sp"></span>
@@ -198,7 +207,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   };
   const IDS = Object.keys(STAFF);
   const REGULAR = { 1: "justin", 2: "justin", 3: "jennifer", 4: "samantha", 5: "samantha" }; // getDay(): Mon=1 … Fri=5
-  const START = "09:00", FINISH = "15:00", BREAK = 30, PAID = 5.5;
+  const START = "09:00", FINISH = "15:00", BREAK = 30; // the usual shift
   const LOOKAHEAD_WEEKS = 8;
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
   const REASONS = ["Sick leave", "Annual leave", "Public holiday", "Clinic closed", "Other"];
@@ -216,7 +225,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   const f1 = n => String(Math.round(n * 100) / 100);
 
   // ---------- State ----------
-  const S = { swaps: [], absences: {}, db: null };
+  const S = { swaps: [], absences: {}, times: {}, extras: [], db: null, missing: false };
   let me = "", tab = "week", wk = 0, mo = 0, modal = null, copyText = "";
   try { const t = localStorage.getItem("roster.tab"); if (["week", "mine", "month", "swaps"].includes(t)) tab = t; } catch (e) {}
   if (["week", "mine", "month", "swaps"].includes(location.hash.slice(1))) tab = location.hash.slice(1);
@@ -230,6 +239,25 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     return k => { const d = parse(k); return isWeekday(d) ? (ov[k] || REGULAR[d.getDay()]) : null; };
   }
   const regular = k => REGULAR[parse(k).getDay()] || null;
+  // Shift times and hours. A rostered shift uses 9:00–15:00 with a 30 min break unless the manager changed that day.
+  const mins = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const paid = (st, fi, br) => Math.max(0, (mins(fi) - mins(st) - (+br || 0)) / 60);
+  const t12 = t => { const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}${m ? ":" + pad(m) : ""}${h < 12 ? "am" : "pm"}`; };
+  const span = (st, fi) => `${t12(st)}–${t12(fi)}`;
+  function shiftOf(k) {
+    const t = S.times[k];
+    const st = t ? t.start : START, fi = t ? t.finish : FINISH, br = t ? t.brk : BREAK;
+    return { start: st, finish: fi, brk: br, hours: paid(st, fi, br), changed: !!t };
+  }
+  const extrasOn = (k, id) => S.extras.filter(x => x.date === k && (!id || x.staff === id)).sort((a, b) => a.start.localeCompare(b.start));
+  const extraHours = x => paid(x.start, x.finish, x.brk);
+  // Paid hours for one person on one day: their rostered shift (unless not worked) plus any extra shifts.
+  function dayHours(k, id, who = roster()) {
+    let h = 0;
+    if (who(k) === id && !S.absences[k]) h += shiftOf(k).hours;
+    extrasOn(k, id).forEach(x => h += extraHours(x));
+    return h;
+  }
   const pendingOn = k => S.swaps.find(s => s.status === "pending" && (s.fromDate === k || s.toDate === k));
   const pendingForMe = () => S.swaps.filter(s => s.status === "pending" && (me === "manager" || s.toStaff === me));
   function upcoming(id, weeks = LOOKAHEAD_WEEKS, backWeeks = 0) {
@@ -252,7 +280,8 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
       return false;
     }
   }
-  const shiftCell = () => `<div class="sh">${START}–${FINISH}<small>${PAID}h · ${BREAK}m break</small></div>`;
+  const shiftCell = k => { const s = shiftOf(k); return `<div class="sh">${span(s.start, s.finish)}<small>${f1(s.hours)}h${s.brk ? ` · ${s.brk}m break` : ""}${s.changed ? " · changed" : ""}</small></div>`; };
+  const extraChip = (x, click) => `<div class="xs${click ? " c" : ""}"${click ? ` data-a="extra" data-i="${x.id}" role="button" tabindex="0"` : ""}>+ ${span(x.start, x.finish)}${x.note ? ` · ${esc(x.note)}` : ""}</div>`;
   function swapLine(s) {
     const byMgr = s.createdBy === "manager";
     return s.toDate
@@ -278,33 +307,41 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   function renderWeek() {
     const mon = mondayOf(addDays(new Date(), wk * 7));
     const ds = DAYS.map((_, i) => ymd(addDays(mon, i)));
-    const who = roster();
-    let h = `<div class="bar"><button data-a="wk" data-v="-1" aria-label="Previous week">‹</button><strong class="rng">${dl(ds[0])} – ${dl(ds[4])}</strong><button data-a="wk" data-v="1" aria-label="Next week">›</button>${wk ? `<button data-a="wk" data-v="0">This week</button>` : ""}</div>`;
+    const who = roster(), mgr = me === "manager";
+    let h = `<div class="bar"><button data-a="wk" data-v="-1" aria-label="Previous week">‹</button><strong class="rng">${dl(ds[0])} – ${dl(ds[4])}</strong><button data-a="wk" data-v="1" aria-label="Next week">›</button>${wk ? `<button data-a="wk" data-v="0">This week</button>` : ""}${mgr ? `<span class="sp only-d"></span><button class="p grow full" data-a="addx" data-d="${ds.includes(today()) ? today() : ds[0]}">Add shift</button>` : ""}</div>`;
+    if (mgr && S.missing) h += `<div class="alert"><strong>Shift changes aren't set up yet</strong>Run the new database script in Supabase to turn on changed times and extra shifts.</div>`;
     h += weekList(ds, who);
     h += `<div class="wrap only-d"><table><tr><th class="n">Staff</th>`;
     ds.forEach((k, i) => h += `<th class="${k === today() ? "today" : ""}">${DAYS[i]}<small>${dl(k)}</small></th>`);
     h += `<th>Week hrs</th></tr>`;
-    const cover = ds.map(() => 0);
+    const cover = ds.map(() => new Set());
     IDS.forEach(id => {
       let t = 0;
       h += `<tr><td class="n"><strong><i class="dot d-${id}"></i>${esc(STAFF[id].name)}</strong></td>`;
       ds.forEach((k, i) => {
-        if (who(k) !== id) { h += `<td><span class="off">–</span></td>`; return; }
+        const xs = extrasOn(k, id), rostered = who(k) === id;
+        const hrs = dayHours(k, id, who); t += hrs; if (hrs) cover[i].add(id);
+        const chips = xs.map(x => extraChip(x, mgr)).join("");
+        if (!rostered) {
+          if (mgr) h += `<td class="c" data-a="addx" data-d="${k}" data-s="${id}" tabindex="0" role="button" aria-label="Add a shift for ${esc(STAFF[id].first)} on ${dlong(k)}">${chips || `<span class="off add">+</span>`}</td>`;
+          else h += `<td>${chips || `<span class="off">–</span>`}</td>`;
+          return;
+        }
         const abs = S.absences[k], sw = regular(k) !== id, pend = pendingOn(k);
-        const clickable = me === "manager" || (me === id && k >= today() && !pend && !abs);
+        const clickable = mgr || (me === id && k >= today() && !pend && !abs);
         const cls = [clickable ? "c" : "", sw ? "ed" : "", pend ? "pend" : ""].join(" ");
         const attrs = clickable ? ` data-a="cell" data-d="${k}" tabindex="0" role="button"` : "";
-        if (abs) h += `<td class="${cls}"${attrs}><div class="nw">Not worked<small>${esc(abs.reason || "")}</small></div></td>`;
-        else { t += PAID; cover[i]++; h += `<td class="${cls}"${attrs}>${shiftCell()}</td>`; }
+        const main = abs ? `<div class="nw">Not worked<small>${esc(abs.reason || "")}</small></div>` : shiftCell(k);
+        h += `<td class="${cls}"${attrs}>${main}${chips}</td>`;
       });
       h += `<td class="tot">${f1(t)}</td></tr>`;
     });
-    h += `<tr class="cov"><td class="n">Desk cover</td>${cover.map(c => `<td class="${c ? "" : "z"}">${c ? c + " on" : "Nobody"}</td>`).join("")}<td></td></tr></table></div>`;
+    h += `<tr class="cov"><td class="n">Desk cover</td>${cover.map(c => `<td class="${c.size ? "" : "z"}">${c.size ? c.size + " on" : "Nobody"}</td>`).join("")}<td></td></tr></table></div>`;
     h += `<p class="note">${
-      me === "manager" ? "Tap a shift to swap it, reassign it, or mark it as not worked."
+      mgr ? "Tap a shift to change its times, swap it, or mark it as not worked. Tap an empty cell or Add shift to add an extra shift, such as training."
       : me ? "Tap one of your upcoming shifts to swap it or ask someone to cover."
       : "Choose your name at the top to swap your shifts."
-    } <span class="only-d">Outlined cells are swapped; dashed cells have a swap waiting for an answer.</span><span class="only-m">Swipe left or right to change week.</span></p>`;
+    } <span class="only-d">Outlined cells are swapped; dashed cells have a swap waiting for an answer. Lines starting with + are extra shifts.</span><span class="only-m">Swipe left or right to change week.</span></p>`;
     return h;
   }
   // Phone layout: one row per day instead of the staff × day grid.
@@ -312,16 +349,18 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     let h = `<div class="wrap mlist only-m">`;
     const hrs = Object.fromEntries(IDS.map(id => [id, 0]));
     ds.forEach((k, i) => {
-      const id = who(k), abs = S.absences[k], sw = regular(k) !== id, pend = pendingOn(k);
+      const id = who(k), abs = S.absences[k], sw = regular(k) !== id, pend = pendingOn(k), sh = shiftOf(k);
       const clickable = me === "manager" || (me === id && k >= today() && !pend && !abs);
-      if (!abs) hrs[id] += PAID;
+      IDS.forEach(x => hrs[x] += dayHours(k, x, who));
       const tags = [];
       if (sw) tags.push(`<span class="tag">Swapped from ${esc(STAFF[regular(k)].first)}</span>`);
+      if (sh.changed && !abs) tags.push(`<span class="tag">Changed time</span>`);
       if (pend) tags.push(`<span class="tag a">Swap pending</span>`);
       if (abs) tags.push(`<span class="tag w">Not worked · ${esc(abs.reason || "")}</span>`);
+      const extras = extrasOn(k).map(x => `<small class="xl"><i class="dot d-${x.staff}"></i>+ ${esc(STAFF[x.staff].first)}${me === x.staff ? " (you)" : ""} ${span(x.start, x.finish)}${x.note ? ` · ${esc(x.note)}` : ""}</small>`).join("");
       const cls = `mday${k === today() ? " is-today" : ""}${pend ? " pend" : sw ? " sw" : ""}${clickable ? " c" : ""}`;
       const inner = `<span class="dd"><b>${DAYS[i]}</b><span>${parse(k).getDate()}</span></span>
-        <span class="dm"><strong><i class="dot d-${id}"></i>${esc(STAFF[id].name)}${me === id ? " (you)" : ""}</strong><small>${START}–${FINISH} · ${PAID}h paid</small>${tags.length ? `<span class="tg">${tags.join("")}</span>` : ""}</span>
+        <span class="dm"><strong><i class="dot d-${id}"></i>${esc(STAFF[id].name)}${me === id ? " (you)" : ""}</strong><small>${span(sh.start, sh.finish)} · ${f1(sh.hours)}h paid</small>${tags.length ? `<span class="tg">${tags.join("")}</span>` : ""}${extras}</span>
         ${clickable ? `<span class="chev" aria-hidden="true">›</span>` : ""}`;
       h += clickable ? `<button class="${cls}" data-a="cell" data-d="${k}" aria-label="${dlong(k)}, ${esc(STAFF[id].name)}">${inner}</button>` : `<div class="${cls}">${inner}</div>`;
     });
@@ -338,24 +377,33 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   function renderMine() {
     if (!me) return `<div class="wrap pad"><p class="off">Choose your name at the top to see your shifts. This device will remember it.</p></div>`;
     if (me === "manager") return incomingHtml() + `<div class="wrap pad"><p class="off">Manager view has no personal shifts. Use the Week and Month tabs to see everyone, or Swaps to answer requests.</p></div>`;
-    const who = roster(), list = upcoming(me);
+    const list = upcoming(me);
+    const horizon = ymd(addDays(new Date(), LOOKAHEAD_WEEKS * 7));
+    const extras = S.extras.filter(x => x.staff === me && x.date >= today() && x.date < horizon);
+    const items = [...list.map(k => ({ k })), ...extras.map(x => ({ k: x.date, x }))].sort((p, q) => p.k.localeCompare(q.k) || (p.x ? 1 : -1));
+    const total = list.reduce((t, k) => t + (S.absences[k] ? 0 : shiftOf(k).hours), 0) + extras.reduce((t, x) => t + extraHours(x), 0);
     let h = incomingHtml();
-    h += `<div class="bar"><strong>${esc(STAFF[me].name)}</strong><span class="off">· ${list.length} shifts in the next ${LOOKAHEAD_WEEKS} weeks · ${f1(list.filter(k => !S.absences[k]).length * PAID)} paid hours</span></div><div class="wrap pad">`;
+    h += `<div class="bar"><strong>${esc(STAFF[me].name)}</strong><span class="off">· ${items.length} shifts in the next ${LOOKAHEAD_WEEKS} weeks · ${f1(total)} paid hours</span></div><div class="wrap pad">`;
     let last = null;
-    list.forEach(k => {
+    items.forEach(({ k, x }) => {
       const w = ymd(mondayOf(parse(k)));
       if (w !== last) { h += `<div class="wk">Week of ${dl(w)}</div>`; last = w; }
-      const abs = S.absences[k], pend = pendingOn(k), reg = regular(k);
+      if (x) {
+        h += `<div class="rq"><span class="d">${dlong(k)}</span><span class="off">${span(x.start, x.finish)}</span><span class="tag">Extra shift${x.note ? ` · ${esc(x.note)}` : ""}</span></div>`;
+        return;
+      }
+      const abs = S.absences[k], pend = pendingOn(k), reg = regular(k), sh = shiftOf(k);
       const tags = [];
       if (reg !== me) {
         const s = S.swaps.filter(x => x.status === "accepted" && ((x.fromDate === k && x.toStaff === me) || (x.toDate === k && x.fromStaff === me))).pop();
         tags.push(`<span class="tag">${s && !s.toDate ? "Covering for" : "Swapped from"} ${esc(STAFF[reg].first)}</span>`);
       }
+      if (sh.changed && !abs) tags.push(`<span class="tag">Changed time</span>`);
       if (abs) tags.push(`<span class="tag w">Not worked · ${esc(abs.reason || "")}</span>`);
       if (pend) tags.push(`<span class="tag a">Swap pending</span>`);
-      h += `<div class="rq"><span class="d">${dlong(k)}</span><span class="off">${START}–${FINISH}</span>${tags.join("")}<span class="sp"></span>${!pend && !abs ? `<button data-a="cell" data-d="${k}">Swap or give away</button>` : ""}</div>`;
+      h += `<div class="rq"><span class="d">${dlong(k)}</span><span class="off">${span(sh.start, sh.finish)}</span>${tags.join("")}<span class="sp"></span>${!pend && !abs ? `<button data-a="cell" data-d="${k}">Swap or give away</button>` : ""}</div>`;
     });
-    if (!list.length) h += `<p class="off">No shifts in the next few weeks.</p>`;
+    if (!items.length) h += `<p class="off">No shifts in the next few weeks.</p>`;
     return h + `</div>`;
   }
 
@@ -366,50 +414,64 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     return { days: out, label: f.toLocaleDateString("en-AU", { month: "long", year: "numeric" }) };
   }
   function payroll(days) {
-    const who = roster(), r = Object.fromEntries(IDS.map(id => [id, { shifts: 0, in: 0, out: 0, off: 0 }]));
+    const who = roster(), r = Object.fromEntries(IDS.map(id => [id, { shifts: 0, extras: 0, hours: 0, in: 0, out: 0, off: 0 }]));
     days.forEach(k => {
       const s = who(k), reg = regular(k);
-      if (S.absences[k]) { r[s].off++; return; }
-      r[s].shifts++;
-      if (s !== reg) { r[s].in++; r[reg].out++; }
+      if (S.absences[k]) r[s].off++;
+      else {
+        r[s].shifts++; r[s].hours += shiftOf(k).hours;
+        if (s !== reg) { r[s].in++; r[reg].out++; }
+      }
+      extrasOn(k).forEach(x => { r[x.staff].extras++; r[x.staff].hours += extraHours(x); });
     });
     return r;
   }
   function renderMonth() {
-    const { days, label } = monthDays(), who = roster(), P = payroll(days);
-    let h = `<div class="bar"><button data-a="mo" data-v="-1" aria-label="Previous month">‹</button><strong class="rng">${label}</strong><button data-a="mo" data-v="1" aria-label="Next month">›</button>${mo ? `<button data-a="mo" data-v="0">This month</button>` : ""}<span class="sp only-d"></span><button class="grow" data-a="copy">Copy summary</button><button class="grow" data-a="csv">Export CSV</button>${me === "manager" ? `<button class="grow p" data-a="xero">Send to Xero</button>` : ""}</div>`;
-    h += `<div class="tiles">${IDS.map(id => `<div class="tile"><div class="nm"><i class="dot d-${id}"></i>${esc(STAFF[id].first)}</div><div class="hv">${f1(P[id].shifts * PAID)}<small>h</small></div><div class="mt">${P[id].shifts} shift${P[id].shifts === 1 ? "" : "s"}${P[id].off ? ` · ${P[id].off} off` : ""}</div></div>`).join("")}</div>`;
+    const { days, label } = monthDays(), who = roster(), P = payroll(days), mgr = me === "manager";
+    let h = `<div class="bar"><button data-a="mo" data-v="-1" aria-label="Previous month">‹</button><strong class="rng">${label}</strong><button data-a="mo" data-v="1" aria-label="Next month">›</button>${mo ? `<button data-a="mo" data-v="0">This month</button>` : ""}<span class="sp only-d"></span><button class="grow" data-a="copy">Copy summary</button><button class="grow" data-a="csv">Export CSV</button>${mgr ? `<button class="grow p" data-a="xero">Send to Xero</button>` : ""}</div>`;
+    const count = p => `${p.shifts} shift${p.shifts === 1 ? "" : "s"}${p.extras ? ` + ${p.extras} extra` : ""}${p.off ? ` · ${p.off} off` : ""}`;
+    h += `<div class="tiles">${IDS.map(id => `<div class="tile"><div class="nm"><i class="dot d-${id}"></i>${esc(STAFF[id].first)}</div><div class="hv">${f1(P[id].hours)}<small>h</small></div><div class="mt">${count(P[id])}</div></div>`).join("")}</div>`;
     h += `<div class="wrap mt-tbl"><table><tr><th class="n">Date</th>${IDS.map(id => `<th><span class="ln">${esc(STAFF[id].name)}</span><span class="fn">${esc(STAFF[id].first)}</span></th>`).join("")}<th class="hm">Day total</th></tr>`;
     days.forEach(k => {
-      const s = who(k), abs = S.absences[k], sw = s !== regular(k);
+      const s = who(k), abs = S.absences[k], sw = s !== regular(k), sh = shiftOf(k);
+      let dayTotal = 0;
       h += `<tr class="${k === today() ? "today" : ""}"><td class="n">${dlong(k)}</td>`;
       IDS.forEach(id => {
-        if (id !== s) { h += `<td><span class="off">–</span></td>`; return; }
-        const click = me === "manager" ? ` class="c${sw ? " ed" : ""}" data-a="cell" data-d="${k}" tabindex="0" role="button"` : (sw ? ` class="ed"` : "");
-        h += abs ? `<td${click}><span class="nw">${esc(abs.reason || "Not worked")}</span></td>` : `<td${click}>${f1(PAID)}</td>`;
+        const hrs = dayHours(k, id, who), xs = extrasOn(k, id).length; dayTotal += hrs;
+        const cls = [mgr ? "c" : "", id === s && sw ? "ed" : ""].join(" ").trim();
+        const attrs = `${cls ? ` class="${cls}"` : ""}${mgr ? ` data-a="${id === s ? "cell" : "addx"}" data-d="${k}" data-s="${id}" tabindex="0" role="button"` : ""}`;
+        let v;
+        if (id === s && abs && !xs) v = `<span class="nw">${esc(abs.reason || "Not worked")}</span>`;
+        else if (!hrs) v = `<span class="off">–</span>`;
+        else v = `${f1(hrs)}${xs || (id === s && sh.changed) ? `<sup class="mk" title="${xs ? "Includes an extra shift" : "Changed time"}">${xs ? "+" : "*"}</sup>` : ""}`;
+        h += `<td${attrs}>${v}</td>`;
       });
-      h += `<td class="tot hm">${abs ? "–" : f1(PAID)}</td></tr>`;
+      h += `<td class="tot hm">${dayTotal ? f1(dayTotal) : "–"}</td></tr>`;
     });
-    const totShifts = IDS.reduce((a, id) => a + P[id].shifts, 0);
+    const tot = IDS.reduce((a, id) => a + P[id].hours, 0);
     h += `<tr class="cov"><td class="n">Swapped in / out</td>${IDS.map(id => `<td>${P[id].in} / ${P[id].out}</td>`).join("")}<td class="hm"></td></tr>`;
     h += `<tr class="cov"><td class="n">Not worked</td>${IDS.map(id => `<td class="${P[id].off ? "z" : ""}">${P[id].off || "–"}</td>`).join("")}<td class="hm"></td></tr>`;
-    h += `<tr class="cov"><td class="n">Shifts worked</td>${IDS.map(id => `<td>${P[id].shifts}</td>`).join("")}<td class="hm">${totShifts}</td></tr>`;
-    h += `<tr><td class="n tot">Paid hours</td>${IDS.map(id => `<td class="tot">${f1(P[id].shifts * PAID)}</td>`).join("")}<td class="tot hm">${f1(totShifts * PAID)}</td></tr></table></div>`;
-    h += `<p class="note">Paid hours exclude the 30 minute unpaid break. Weekdays only, based on the roster after swaps. Days marked not worked are left out.${me === "manager" ? " Tap a shift to swap, reassign or mark it as not worked." : ""} Outlined cells are swapped days.</p>`;
+    h += `<tr class="cov"><td class="n">Extra shifts</td>${IDS.map(id => `<td>${P[id].extras || "–"}</td>`).join("")}<td class="hm"></td></tr>`;
+    h += `<tr class="cov"><td class="n">Shifts worked</td>${IDS.map(id => `<td>${P[id].shifts}</td>`).join("")}<td class="hm">${IDS.reduce((a, id) => a + P[id].shifts, 0)}</td></tr>`;
+    h += `<tr><td class="n tot">Paid hours</td>${IDS.map(id => `<td class="tot">${f1(P[id].hours)}</td>`).join("")}<td class="tot hm">${f1(tot)}</td></tr></table></div>`;
+    h += `<p class="note">Paid hours exclude unpaid breaks. Usual shift 9am–3pm with a 30 minute break (5.5 hours). * changed time, + includes an extra shift. Days marked not worked are left out.${mgr ? " Tap a cell to change that day." : ""} Outlined cells are swapped days.</p>`;
     if (copyText) h += `<textarea class="copy" id="copyBox" readonly aria-label="Payroll summary">${esc(copyText)}</textarea>`;
     return h;
   }
   function summaryText() {
     const { days, label } = monthDays(), P = payroll(days);
-    return [`Toolbox Clinic admin payroll: ${label}`, `Shift ${START}-${FINISH}, ${BREAK} min unpaid break = ${PAID} paid hours`, "",
-      ...IDS.map(id => `${STAFF[id].name}: ${P[id].shifts} shifts, ${f1(P[id].shifts * PAID)} hours${P[id].off ? ` (${P[id].off} not worked)` : ""}`)].join("\n");
+    return [`Toolbox Clinic admin payroll: ${label}`, `Paid hours exclude unpaid breaks`, "",
+      ...IDS.map(id => `${STAFF[id].name}: ${f1(P[id].hours)} hours (${P[id].shifts} shifts${P[id].extras ? `, ${P[id].extras} extra` : ""}${P[id].off ? `, ${P[id].off} not worked` : ""})`)].join("\n");
   }
   async function exportCsv() {
     const { days } = monthDays(), who = roster();
+    const q = v => `"${String(v).replace(/"/g, '""')}"`;
     const rows = ["Name,Date,Day,Start,Finish,Break mins,Paid hours,Note"];
     days.forEach(k => {
-      const s = who(k), abs = S.absences[k], note = abs ? `Not worked: ${abs.reason || ""}` : (s !== regular(k) ? `Swapped from ${STAFF[regular(k)].name}` : "");
-      rows.push([`"${STAFF[s].name}"`, k, DAYS[parse(k).getDay() - 1], START, FINISH, BREAK, abs ? 0 : PAID, `"${note}"`].join(","));
+      const s = who(k), abs = S.absences[k], sh = shiftOf(k), day = DAYS[parse(k).getDay() - 1];
+      const note = abs ? `Not worked: ${abs.reason || ""}` : [s !== regular(k) ? `Swapped from ${STAFF[regular(k)].name}` : "", sh.changed ? "Changed time" : ""].filter(Boolean).join("; ");
+      rows.push([q(STAFF[s].name), k, day, sh.start, sh.finish, sh.brk, abs ? 0 : f1(sh.hours), q(note)].join(","));
+      extrasOn(k).forEach(x => rows.push([q(STAFF[x.staff].name), k, day, x.start, x.finish, x.brk, f1(extraHours(x)), q(`Extra shift${x.note ? ": " + x.note : ""}`)].join(",")));
     });
     const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
     const a = document.createElement("a");
@@ -461,7 +523,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   }
   function swapModal(k) {
     return `<div class="ov" data-a="bg"><div class="md" role="dialog" aria-modal="true" aria-labelledby="mdh">
-      <h2 id="mdh">Swap ${dlong(k)}</h2><p class="ctx">${esc(STAFF[me].name)} · ${START}–${FINISH}</p>
+      <h2 id="mdh">Swap ${dlong(k)}</h2><p class="ctx">${esc(STAFF[me].name)} · ${span(shiftOf(k).start, shiftOf(k).finish)}</p>
       ${swapFields(me, false)}
       <div class="row"><button class="p" data-a="send">Send request</button><button data-a="close">Cancel</button></div></div></div>`;
   }
@@ -475,22 +537,51 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     if (mgr) { const next = list.find(d => d >= today()); if (next) sel.value = next; }
     $("theirs").hidden = $("kCover").checked;
   }
+  const timeFields = (pre, st, fi, br) => `<div class="tf"><span><label for="${pre}s">Start</label><input type="time" id="${pre}s" value="${st}" step="300"></span><span><label for="${pre}f">Finish</label><input type="time" id="${pre}f" value="${fi}" step="300"></span><span><label for="${pre}b">Unpaid break (min)</label><input type="number" id="${pre}b" value="${br}" min="0" max="240" step="5" inputmode="numeric"></span></div>`;
+  function readTimes(pre) {
+    const st = $(pre + "s").value, fi = $(pre + "f").value, br = Math.round(+$(pre + "b").value || 0);
+    if (!st || !fi) return toast("Enter a start and finish time"), null;
+    if (mins(fi) <= mins(st)) return toast("Finish must be after start"), null;
+    if (br < 0 || br >= mins(fi) - mins(st)) return toast("The break must be shorter than the shift"), null;
+    return { st, fi, br };
+  }
   function dayModal(k) {
-    const s = roster()(k), abs = S.absences[k], pend = pendingOn(k);
+    const s = roster()(k), abs = S.absences[k], pend = pendingOn(k), sh = shiftOf(k);
+    const extras = extrasOn(k);
+    const extraList = `<h2 class="sec">Extra shifts</h2>${extras.length ? extras.map(x => `<div class="rq"><span style="flex:1;min-width:0"><i class="dot d-${x.staff}"></i><strong>${esc(STAFF[x.staff].first)}</strong> ${span(x.start, x.finish)} · ${f1(extraHours(x))}h${x.note ? `<br><span class="off">${esc(x.note)}</span>` : ""}</span><button data-a="extra" data-i="${x.id}">Edit</button></div>`).join("") : `<p class="off" style="margin:4px 0">None on this day.</p>`}
+      <div class="row"><button data-a="addx" data-d="${k}">Add extra shift</button></div>`;
     let body;
-    if (abs) body = `<p>Marked as not worked: <strong>${esc(abs.reason || "")}</strong></p><div class="row"><button class="p" data-a="worked">Mark as worked</button><button data-a="close">Cancel</button></div>`;
+    if (abs) body = `<p>Marked as not worked: <strong>${esc(abs.reason || "")}</strong></p><div class="row"><button class="p" data-a="worked">Mark as worked</button></div>${extraList}<div class="row"><button data-a="close">Close</button></div>`;
     else {
-      body = pend
-        ? `<p class="alert" style="margin:10px 0 0">A swap request is waiting on this day. Answer it on the Swaps tab before changing this shift.</p>`
-        : `<h2 style="margin-top:14px;font-size:14px">Swap or reassign</h2>${swapFields(s, true)}
+      body = `<h2 class="sec">Shift times</h2>${timeFields("t", sh.start, sh.finish, sh.brk)}
+        <div class="row"><button class="p" data-a="times">Save times</button>${sh.changed ? `<button data-a="timesReset">Reset to 9am–3pm</button>` : ""}</div>`;
+      body += extraList;
+      body += pend
+        ? `<p class="alert" style="margin:14px 0 0">A swap request is waiting on this day. Answer it on the Swaps tab before swapping this shift.</p>`
+        : `<h2 class="sec">Swap or reassign</h2>${swapFields(s, true)}
            <div class="row"><button class="p" data-a="mswap">Save change</button></div>`;
-      body += `<h2 style="margin-top:18px;font-size:14px">Not worked</h2>
+      body += `<h2 class="sec">Not worked</h2>
         <label for="rs">Reason</label><select id="rs">${REASONS.map(r => `<option>${r}</option>`).join("")}</select>
         <div class="row"><button data-a="absent">Mark as not worked</button><button data-a="close">Close</button></div>`;
     }
     return `<div class="ov" data-a="bg"><div class="md" role="dialog" aria-modal="true" aria-labelledby="mdh">
-      <h2 id="mdh">${esc(STAFF[s].name)} · ${dlong(k)}</h2><p class="ctx">${START}–${FINISH} · ${PAID} paid hours${s !== regular(k) ? ` · swapped from ${esc(STAFF[regular(k)].first)}` : ""}</p>
+      <h2 id="mdh">${esc(STAFF[s].name)} · ${dlong(k)}</h2><p class="ctx">${span(sh.start, sh.finish)} · ${f1(sh.hours)} paid hours${sh.changed ? " (changed)" : ""}${s !== regular(k) ? ` · swapped from ${esc(STAFF[regular(k)].first)}` : ""}</p>
       ${body}</div></div>`;
+  }
+  // Add or edit an extra shift. Adding can cover several people at once (e.g. a training hour).
+  function extraModal({ id, k, staff }) {
+    const x = id ? S.extras.find(e => e.id === id) : null;
+    const date = x ? x.date : k, st = x ? x.start : "15:00", fi = x ? x.finish : "16:00", br = x ? x.brk : 0;
+    const who = x ? [x.staff] : staff ? [staff] : [];
+    return `<div class="ov" data-a="bg"><div class="md" role="dialog" aria-modal="true" aria-labelledby="mdh">
+      <h2 id="mdh">${x ? "Edit extra shift" : "Add extra shift"}</h2><p class="ctx">Paid on top of the usual roster, e.g. a training hour.</p>
+      <label for="xd">Date</label><input type="date" id="xd" value="${date}">
+      ${x ? `<label for="xp">Staff member</label><select id="xp">${IDS.map(i => `<option value="${i}"${i === x.staff ? " selected" : ""}>${esc(STAFF[i].name)}</option>`).join("")}</select>`
+        : `<label>Who</label>${IDS.map(i => `<label class="r"><input type="checkbox" name="xw" value="${i}"${who.includes(i) ? " checked" : ""}> ${esc(STAFF[i].name)}</label>`).join("")}`}
+      ${timeFields("x", st, fi, br)}
+      <label for="xn">Note (optional)</label><input id="xn" maxlength="120" value="${x ? esc(x.note || "") : ""}" placeholder="e.g. Training">
+      <div class="row"><button class="p" data-a="xsave">${x ? "Save" : "Add shift"}</button>${x ? `<button class="x" data-a="xdel">Delete</button>` : ""}<button data-a="close">Cancel</button></div>
+    </div></div>`;
   }
   function openCell(k) {
     if (me === "manager") modal = { type: "day", k };
@@ -529,7 +620,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   function renderModal() {
     const m = $("modal");
     if (!modal) { m.innerHTML = ""; return; }
-    m.innerHTML = modal.type === "swap" ? swapModal(modal.k) : dayModal(modal.k);
+    m.innerHTML = modal.type === "swap" ? swapModal(modal.k) : modal.type === "extra" ? extraModal(modal) : dayModal(modal.k);
     if (m.querySelector("#sw2")) fillTheirs();
     const f = m.querySelector("select, button"); if (f) f.focus();
   }
@@ -544,7 +635,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   // ---------- Events ----------
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && modal) { modal = null; renderModal(); }
-    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("td[data-a=cell]")) { e.preventDefault(); openCell(e.target.dataset.d); }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("[data-a=cell],[data-a=addx],[data-a=extra]") && e.target.tagName !== "BUTTON") { e.preventDefault(); e.target.click(); }
   });
   document.addEventListener("change", e => { if (e.target.id === "sw1" || e.target.name === "kind") fillTheirs(); });
   document.addEventListener("click", async e => {
@@ -555,6 +646,36 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
     else if (a === "wk") { wk = t.dataset.v === "0" ? 0 : wk + +t.dataset.v; render(); }
     else if (a === "mo") { mo = t.dataset.v === "0" ? 0 : mo + +t.dataset.v; copyText = ""; render(); }
     else if (a === "cell") openCell(t.dataset.d);
+    else if (a === "addx" && me === "manager") { modal = { type: "extra", k: t.dataset.d, staff: t.dataset.s }; renderModal(); }
+    else if (a === "extra" && me === "manager") { modal = { type: "extra", id: t.dataset.i }; renderModal(); }
+    else if (a === "times" || a === "timesReset") {
+      const k = modal.k;
+      if (a === "timesReset") { if (await write(() => S.db.raw(supa.from("shift_times").delete().eq("date", k)))) { modal = null; renderModal(); toast("Back to 9am–3pm"); } return; }
+      const v = readTimes("t"); if (!v) return;
+      const usual = v.st === START && v.fi === FINISH && v.br === BREAK;
+      const op = usual ? supa.from("shift_times").delete().eq("date", k)
+        : supa.from("shift_times").upsert({ date: k, start_time: v.st, finish_time: v.fi, break_mins: v.br, updated_at: new Date().toISOString() });
+      if (await write(() => S.db.raw(op))) { modal = null; renderModal(); toast(`${dlong(k)}: ${span(v.st, v.fi)}, ${f1(paid(v.st, v.fi, v.br))} paid hours`); }
+    }
+    else if (a === "xsave") {
+      const v = readTimes("x"); if (!v) return;
+      const date = $("xd").value, note = $("xn").value.trim().slice(0, 120) || null;
+      if (!date || !isWeekday(parse(date))) { toast("Pick a weekday"); return; }
+      const row = { date, start_time: v.st, finish_time: v.fi, break_mins: v.br, note };
+      if (modal.id) {
+        if (await write(() => S.db.raw(supa.from("extra_shifts").update({ ...row, staff: $("xp").value }).eq("id", modal.id)))) { modal = null; renderModal(); toast("Extra shift saved"); }
+      } else {
+        const who = [...document.querySelectorAll('input[name="xw"]:checked')].map(i => i.value);
+        if (!who.length) { toast("Tick at least one person"); return; }
+        if (await write(() => S.db.raw(supa.from("extra_shifts").insert(who.map(staff => ({ ...row, staff })))))) {
+          modal = null; renderModal();
+          toast(`Added ${span(v.st, v.fi)} on ${dlong(date)} for ${who.map(i => STAFF[i].first).join(", ")}`);
+        }
+      }
+    }
+    else if (a === "xdel") {
+      if (await write(() => S.db.raw(supa.from("extra_shifts").delete().eq("id", modal.id)))) { modal = null; renderModal(); toast("Extra shift deleted"); }
+    }
     else if (a === "close") { modal = null; renderModal(); }
     else if (a === "decide") decide(t.dataset.i, t.dataset.v);
     else if (a === "csv") exportCsv();
@@ -621,6 +742,7 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   const ok = ({ error }) => { if (error) throw error; };
   // Same small interface the page used before, backed by Supabase tables.
   const dbShim = {
+    raw: async query => { ok(await query); await load(); },
     collection: name => ({ add: async doc => { ok(await supa.from(name).insert(toRow(doc))); await load(); } }),
     doc: path => {
       const [table, id] = path.split("/");
@@ -634,10 +756,16 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
   };
 
   async function load() {
-    const [sw, ab] = await Promise.all([
+    const [sw, ab, st, ex] = await Promise.all([
       supa.from("swaps").select("*").order("created_at"),
       supa.from("absences").select("*"),
+      supa.from("shift_times").select("*"),
+      supa.from("extra_shifts").select("*").order("date"),
     ]);
+    // The shift_times / extra_shifts tables arrive with a separate setup script; work without them until it's run.
+    S.missing = !!(st.error || ex.error);
+    S.times = st.error ? {} : Object.fromEntries(st.data.map(r => [r.date, { start: r.start_time, finish: r.finish_time, brk: r.break_mins }]));
+    S.extras = ex.error ? [] : ex.data.map(r => ({ id: r.id, date: r.date, staff: r.staff, start: r.start_time, finish: r.finish_time, brk: r.break_mins, note: r.note || "" }));
     if (sw.error || ab.error) { const e = sw.error || ab.error; status(`Couldn't load the roster (${e.code || "error"}: ${e.message}). Check your connection and reload.`, true); return; }
     S.swaps = sw.data.map(fromRow);
     S.absences = Object.fromEntries(ab.data.map(r => [r.date, { reason: r.reason, staff: r.staff, updatedAt: r.updated_at }]));
@@ -674,6 +802,8 @@ textarea.copy{width:100%;box-sizing:border-box;margin-top:10px;padding:8px;borde
       channel = supa.channel("roster")
         .on("postgres_changes", { event: "*", schema: "public", table: "swaps" }, () => load())
         .on("postgres_changes", { event: "*", schema: "public", table: "absences" }, () => load())
+        .on("postgres_changes", { event: "*", schema: "public", table: "shift_times" }, () => load())
+        .on("postgres_changes", { event: "*", schema: "public", table: "extra_shifts" }, () => load())
         .subscribe();
     }
   }
